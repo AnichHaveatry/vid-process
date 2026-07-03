@@ -73,7 +73,8 @@ def ffprobe_video(path):
             "path": path,
             "size_mb": round(size_bytes / 1024 / 1024, 2),
             "duration_sec": round(duration, 2),
-            "bitrate_kbps": round(bitrate / 1000, 2),
+            # "bitrate_kbps": round(bitrate / 1000, 2),
+            "bitrate_mbps": round(bitrate / 1_000_000, 2),
             "resolution": f"{width}x{height}"
         }
 
@@ -93,7 +94,8 @@ def main():
             if r:
                 results.append(r)
 
-    results.sort(key=lambda x: x["bitrate_kbps"], reverse=True)
+    # results.sort(key=lambda x: x["bitrate_kbps"], reverse=True)
+    results.sort(key=lambda x: x["bitrate_mbps"], reverse=True)
 
     with open("video_bitrate_report.csv", "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(
@@ -102,7 +104,8 @@ def main():
                 "path",
                 "size_mb",
                 "duration_sec",
-                "bitrate_kbps",
+                # "bitrate_kbps",
+                "bitrate_mbps",
                 "resolution"
             ]
         )
