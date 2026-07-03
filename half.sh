@@ -1,6 +1,6 @@
 for f in *.{mp4,mkv,avi,mov,flv,webm}; do
 [ -e "$f" ] || continue
-ffmpeg -hwaccel cuda -i "$f" -vf "scale=trunc(iw/2/2)*2:trunc(ih/2/2)*2" -c:v libx264 -crf 28 -preset veryslow -c:a copy "half_$f"
+ffmpeg -i "$f" -vf "scale=trunc(iw/2/2)*2:trunc(ih/2/2)*2" -c:v libx264 -crf 28 -preset veryslow -c:a copy "half_$f"
 done
 
 # 画质控制
