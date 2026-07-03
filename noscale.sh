@@ -1,4 +1,6 @@
 for f in *.{mp4,mkv,avi,mov,flv,webm}; do
 [ -e "$f" ] || continue
-ffmpeg -i "$f" -c:v libx264 -crf 28 -preset veryslow -c:a copy "half_$f"
+ffmpeg -hwaccel mediacodec -i "$f" \
+-c:v h264_mediacodec -b:v 4M \
+-c:a copy "half_$f"
 done

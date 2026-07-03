@@ -1,20 +1,15 @@
 for f in *.{mp4,mkv,avi,mov,flv,webm}; do
 [ -e "$f" ] || continue
-ffmpeg -i "$f" -vf "scale=trunc(iw/2/2)*2:trunc(ih/2/2)*2" -c:v libx264 -crf 28 -preset veryslow -c:a copy "half_$f"
+ffmpeg -hwaccel mediacodec -i "$f" \
+-vf "scale=trunc(iw/2/2)*2:trunc(ih/2/2)*2" \
+-c:v h264_mediacodec -b:v 4M \
+-c:a copy "half_$f"
 done
 
-# 画质控制
-# -crf 23
-# CRF 数值：
-# 18 = 高质量大文件
-# 23 = 默认平衡
-# 28 = 小文件低画质
+# MediaCodec 在 FFmpeg 里有个限制：某些滤镜（包括部分 scale）可能会导致回退到 CPU
+# 如果发现速度不明显提升，可以试着删除这一行
+# -vf "scale=trunc(iw/2/2)*2:trunc(ih/2/2)*2" \
+# 删除这一行的版本在 noscale.sh
 
-# 编码速度
-# -preset medium
-# 速度/压缩率平衡：
-# ultrafast（最快）
-# fast
-# medium（默认）
-# slow
-# veryslow（最省空间）
+# -b:v 4M
+# 调视频码率，单位 Mb/s（兆比特每秒）
