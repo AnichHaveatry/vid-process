@@ -3,6 +3,7 @@ import csv
 import json
 import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import math
 
 VIDEO_EXTS = {
     ".mp4", ".mkv", ".avi", ".mov", ".flv",
@@ -69,13 +70,16 @@ def ffprobe_video(path):
         if bitrate == 0 and duration > 0:
             bitrate = int((size_bytes * 8) / duration)
 
+        pixel_scale = round(math.sqrt(width * height), 2) if width and height else 0
+
         return {
             "path": path,
             "size_mb": round(size_bytes / 1024 / 1024, 2),
             "duration_sec": round(duration, 2),
             # "bitrate_kbps": round(bitrate / 1000, 2),
             "bitrate_mbps": round(bitrate / 1_000_000, 2),
-            "resolution": f"{width}x{height}"
+            "resolution": f"{width}x{height}",
+            "resolution_scale": pixel_scale
         }
 
     except Exception:
@@ -106,7 +110,8 @@ def main():
                 "duration_sec",
                 # "bitrate_kbps",
                 "bitrate_mbps",
-                "resolution"
+                "resolution",
+                "resolution_scale"
             ]
         )
         writer.writeheader()
