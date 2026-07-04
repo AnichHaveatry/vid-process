@@ -1,6 +1,6 @@
 for f in *.{mp4,mkv,avi,mov,flv,webm}; do
 [ -e "$f" ] || continue
-ffmpeg -hwaccel cuda -hwaccel_output_format cuda -i "$f" \
+ffmpeg -threads 0  -hwaccel cuda -hwaccel_output_format cuda -i "$f" \
 -vf "scale_cuda=trunc(iw/2/2)*2:trunc(ih/2/2)*2" \
 -c:v h264_nvenc -b:v 4M \
 -c:a copy "half_$f"
@@ -17,3 +17,6 @@ done
 # 如需进一步提升速度，可增加：
 # -preset p1
 # p1 最快，p7 画质最高但速度最慢，默认一般为 p4。
+
+# -threads 0
+# 这项原本没有，0 为默认值，但是有时候出问题设为 1 试试。
