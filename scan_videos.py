@@ -58,18 +58,31 @@ def ffprobe_video(path):
 
         width = 0
         height = 0
+        fps = 0
 
         for s in streams:
             if s.get("codec_type") == "video":
                 width = s.get("width", 0)
                 height = s.get("height", 0)
+                # 获取帧率，例如：
+                # 30000/1001 -> 29.97
+                # 24000/1001 -> 23.98
+                r_frame_rate = s.get("r_frame_rate", "0/1")
+                try:
+                    num, den = map(int, r_frame_rate.split("/"))
+                    if den != 0:
+                        fps = round(num / den, 2)
+                except Exception:
+                    fps = 0
                 break
 
         size_bytes = os.path.getsize(path)
 
+        # 如果 ffprobe 没返回码率，则自行计算
         if bitrate == 0 and duration > 0:
             bitrate = int((size_bytes * 8) / duration)
 
+        # 分辨率尺度
         pixel_scale = round(math.sqrt(width * height), 2) if width and height else 0
 
         return {
@@ -79,7 +92,8 @@ def ffprobe_video(path):
             # "bitrate_kbps": round(bitrate / 1000, 2),
             "bitrate_mbps": round(bitrate / 1_000_000, 2),
             "resolution": f"{width}x{height}",
-            "resolution_scale": pixel_scale
+            "resolution_scale": pixel_scale,
+            "fps": fps
         }
 
     except Exception:
@@ -98,10 +112,11 @@ def main():
             if r:
                 results.append(r)
 
+    # 默认按照码率从高到低排序
     # results.sort(key=lambda x: x["bitrate_kbps"], reverse=True)
     results.sort(key=lambda x: x["bitrate_mbps"], reverse=True)
 
-    with open("video_bitrate_report.csv", "w", newline="", encoding="utf-8") as f:
+    with open("video_report.csv", "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(
             f,
             fieldnames=[
@@ -111,14 +126,15 @@ def main():
                 # "bitrate_kbps",
                 "bitrate_mbps",
                 "resolution",
-                "resolution_scale"
+                "resolution_scale",
+                "fps"
             ]
         )
         writer.writeheader()
         writer.writerows(results)
 
     print(f"Done. {len(results)} videos scanned.")
-    print("Saved to video_bitrate_report.csv")
+    print("Saved to video_report.csv")
 
 
 if __name__ == "__main__":
