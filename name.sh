@@ -1,10 +1,6 @@
-#!/bin/bash
-
 for file in half_*; do
     [ -e "$file" ] || continue
-
     new_name="${file#half_}"
-
     mv -- "$file" "$new_name"
 done
 

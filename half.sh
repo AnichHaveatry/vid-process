@@ -1,9 +1,12 @@
 for f in *.{mp4,mkv,avi,mov,flv,webm}; do
-[ -e "$f" ] || continue
-ffmpeg -hwaccel mediacodec -i "$f" \
--vf "scale=trunc(iw/2/2)*2:trunc(ih/2/2)*2" \
--c:v h264_mediacodec -b:v 4M \
--c:a copy "half_$f"
+    [ -e "$f" ] || continue
+    ffmpeg -threads 0 \
+        -hwaccel mediacodec \
+        -i "$f" \
+        -vf "scale=trunc(iw/2/2)*2:trunc(ih/2/2)*2" \
+        -c:v h264_mediacodec \
+        -b:v 4M \
+        -c:a copy "half_$f"
 done
 
 # MediaCodec 在 FFmpeg 里有个限制：某些滤镜（包括部分 scale）可能会导致回退到 CPU
