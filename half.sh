@@ -1,6 +1,7 @@
 for f in *.{mp4,mkv,avi,mov,flv,webm}; do
     [ -e "$f" ] || continue
-    ffmpeg -threads 0 \
+    ffmpeg -hide_banner \
+        -threads 0 \
         -hwaccel cuda \
         -hwaccel_output_format cuda \
         -i "$f" \

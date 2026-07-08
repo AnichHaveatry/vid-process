@@ -13,7 +13,8 @@ for f in *.{mp4,mkv,avi,mov,flv,webm}; do
     if [ "$need" -eq 1 ]; then
         new_fps=$(awk "BEGIN {print $real_fps/2}")
         echo "$f: ${real_fps}fps -> ${new_fps}fps"
-        ffmpeg -threads 0 \
+        ffmpeg -hide_banner \
+            -threads 0 \
             -hwaccel cuda \
             -hwaccel_output_format cuda \
             -i "$f" \
