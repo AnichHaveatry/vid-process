@@ -7,7 +7,7 @@ for f in *.{mp4,mkv,avi,mov,flv,webm}; do
         -i "$f" \
         -vf "scale_cuda=trunc(iw/2/2)*2:trunc(ih/2/2)*2" \
         -c:v h264_nvenc \
-        -b:v 4M \
+        -b:v 2M \
         -c:a copy "half_$f"
 done
 
