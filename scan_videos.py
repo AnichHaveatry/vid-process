@@ -30,6 +30,19 @@ def find_videos(root="."):
             pass
 
 
+def parse_fps(value):
+    """
+    解析 ffprobe 的 fps 格式:
+    30000/1001 -> 29.97
+    """
+    try:
+        num, den = map(int, value.split("/"))
+        if den != 0:
+            return num / den
+    except Exception:
+        pass
+    return 0
+
 def ffprobe_video(path):
     cmd = [
         "ffprobe",
@@ -59,21 +72,16 @@ def ffprobe_video(path):
         width = 0
         height = 0
         fps = 0
+        r_fps = 0
 
         for s in streams:
             if s.get("codec_type") == "video":
                 width = s.get("width", 0)
                 height = s.get("height", 0)
-                # 获取帧率，例如：
-                # 30000/1001 -> 29.97
-                # 24000/1001 -> 23.98
-                r_frame_rate = s.get("r_frame_rate", "0/1")
-                try:
-                    num, den = map(int, r_frame_rate.split("/"))
-                    if den != 0:
-                        fps = round(num / den, 2)
-                except Exception:
-                    fps = 0
+                # 真实平均帧率
+                fps = parse_fps(s.get("avg_frame_rate", "0/1"))
+                # metadata声明帧率
+                r_fps = parse_fps(s.get("r_frame_rate", "0/1"))
                 break
 
         size_bytes = os.path.getsize(path)
@@ -93,7 +101,10 @@ def ffprobe_video(path):
             "bitrate_mbps": round(bitrate / 1_000_000, 2),
             "resolution": f"{width}x{height}",
             "resolution_scale": pixel_scale,
-            "fps": fps
+            # 平均真实fps
+            "fps": round(fps, 2),
+            # 文件声明fps
+            "r_fps": round(r_fps, 2)
         }
 
     except Exception:
@@ -127,7 +138,8 @@ def main():
                 "bitrate_mbps",
                 "resolution",
                 "resolution_scale",
-                "fps"
+                "fps",
+                "r_fps"
             ]
         )
         writer.writeheader()
