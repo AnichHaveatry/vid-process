@@ -2,19 +2,12 @@ for f in *.{mp4,mkv,avi,mov,flv,webm}; do
     [ -e "$f" ] || continue
     ffmpeg -hide_banner \
         -threads 0 \
-        -hwaccel cuda \
-        -hwaccel_output_format cuda \
         -i "$f" \
-        -vf "scale_cuda=trunc(iw/2/2)*2:trunc(ih/2/2)*2" \
+        -vf "scale=trunc(iw/2/2)*2:trunc(ih/2/2)*2" \
         -c:v h264_nvenc \
-        -b:v 2M \
+        -b:v 3M \
         -c:a copy "half_$f"
 done
-
-# CUDA/NVENC 支持 GPU 缩放，使用 scale_cuda 可避免回退到 CPU。
-# 如果发现速度仍然不理想，可以删除下面这一行进行对比测试：
-# -vf "scale_cuda=trunc(iw/2/2)*2:trunc(ih/2/2)*2" \
-# 删除这一行的版本可保存为 noscale.sh。
 
 # -b:v 4M
 # 设置视频目标码率，单位 Mb/s（兆比特每秒）。
@@ -25,3 +18,5 @@ done
 
 # -threads 0
 # 这项原本没有，0 为默认值，但是有时候出问题设为 1 试试。
+
+# 因为遇到 NVIDIA 硬件解码器（NVDEC）出错，所以不用硬解码，而是使用 CPU 解码，用 NVENC 编码
