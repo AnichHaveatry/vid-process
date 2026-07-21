@@ -5,6 +5,8 @@ import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import math
 
+# 注意，这个代码只能在linux中运行。windows中运行无输出
+
 VIDEO_EXTS = {
     ".mp4", ".mkv", ".avi", ".mov", ".flv",
     ".wmv", ".webm", ".m4v", ".ts", ".3gp"
