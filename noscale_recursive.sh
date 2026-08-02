@@ -1,4 +1,4 @@
-find . -type f \( -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.avi" -o -iname "*.mov" -o -iname "*.flv" -o -iname "*.webm" \) | while IFS= read -r f; do
+find . -type f \( -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.avi" -o -iname "*.mov" -o -iname "*.flv" -o -iname "*.webm" \) -print0 | while IFS= read -r -d '' f; do
     dir=$(dirname "$f")
     filename=$(basename "$f")
     ffmpeg -hide_banner \
