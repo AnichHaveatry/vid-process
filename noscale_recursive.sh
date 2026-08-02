@@ -2,6 +2,7 @@ find . -type f \( -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.avi" -o -iname "
     dir=$(dirname "$f")
     filename=$(basename "$f")
     ffmpeg -hide_banner \
+        -nostdin -y \
         -threads 0 \
         -i "$f" \
         -c:v h264_nvenc \
