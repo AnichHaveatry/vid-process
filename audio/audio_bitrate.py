@@ -9,14 +9,31 @@ VIDEO_EXTENSIONS = {
     ".ts", ".mts", ".3gp"
 }
 
+CSV_FIELDS = [
+    "file_path",
+    "file_size_bytes",
+    "has_audio",
+    "audio_codec",
+    "audio_codec_long",
+    "audio_profile",
+    "sample_rate",
+    "channels",
+    "channel_layout",
+    "bit_rate",
+    "sample_fmt",
+    "bits_per_sample",
+    "audio_duration",
+    "format_name",
+    "container_duration",
+    "file_bit_rate",
+    "error"
+]
+
 
 def get_audio_info(filepath):
-    """
-    使用 ffprobe 获取音频流信息
-    """
     cmd = [
         "ffprobe",
-        "-v", "quiet",
+        "-v", "error",
         "-print_format", "json",
         "-show_streams",
         "-show_format",
@@ -31,45 +48,48 @@ def get_audio_info(filepath):
             text=True
         )
 
+        if result.returncode != 0:
+            return {
+                "error": result.stderr.strip()
+            }
+
         data = json.loads(result.stdout)
-        audio_stream = None
+        audio = None
+
         for stream in data.get("streams", []):
             if stream.get("codec_type") == "audio":
-                audio_stream = stream
+                audio = stream
                 break
-        if not audio_stream:
+
+        if audio is None:
             return {
                 "has_audio": False
             }
+
         fmt = data.get("format", {})
 
         return {
             "has_audio": True,
             "audio_codec":
-                audio_stream.get("codec_name"),
+                audio.get("codec_name"),
             "audio_codec_long":
-                audio_stream.get("codec_long_name"),
+                audio.get("codec_long_name"),
             "audio_profile":
-                audio_stream.get("profile"),
+                audio.get("profile"),
             "sample_rate":
-                audio_stream.get("sample_rate"),
+                audio.get("sample_rate"),
             "channels":
-                audio_stream.get("channels"),
+                audio.get("channels"),
             "channel_layout":
-                audio_stream.get("channel_layout"),
+                audio.get("channel_layout"),
             "bit_rate":
-                audio_stream.get("bit_rate"),
+                audio.get("bit_rate"),
             "sample_fmt":
-                audio_stream.get("sample_fmt"),
+                audio.get("sample_fmt"),
             "bits_per_sample":
-                audio_stream.get("bits_per_sample"),
+                audio.get("bits_per_sample"),
             "audio_duration":
-                audio_stream.get("duration"),
-            "audio_tags":
-                json.dumps(
-                    audio_stream.get("tags", {}),
-                    ensure_ascii=False
-                ),
+                audio.get("duration"),
             "format_name":
                 fmt.get("format_name"),
             "container_duration":
@@ -84,58 +104,58 @@ def get_audio_info(filepath):
         }
 
 
-def scan_videos(root_folder, output_csv):
+def scan_videos(folder):
     rows = []
-    for root, dirs, files in os.walk(root_folder):
-        for file in files:
-            ext = os.path.splitext(file)[1].lower()
+    count = 0
+
+    for root, _, files in os.walk(folder):
+        for name in files:
+            ext = os.path.splitext(name)[1].lower()
             if ext not in VIDEO_EXTENSIONS:
                 continue
-
-            filepath = os.path.join(root, file)
-            print("Processing:", filepath)
-
-            try:
-                size = os.path.getsize(filepath)
-            except:
-                size = None
-
-            info = {
-                "file_path": filepath,
-                "file_size_bytes": size
+            count += 1
+            path = os.path.join(root, name)
+            print("扫描:", path)
+            relative_path = os.path.relpath(path, folder)
+            row = {
+                "file_path": "./" + relative_path.replace("\\", "/"),
+                "file_size_bytes": os.path.getsize(path)
             }
-            audio_info = get_audio_info(filepath)
-            info.update(audio_info)
-            rows.append(info)
+            row.update(get_audio_info(path))
+            rows.append(row)
+
+    print(f"\n找到视频数量: {count}")
+    return rows
 
 
-    # 自动生成所有字段
-    keys = set()
-
-    for r in rows:
-        keys.update(r.keys())
-    keys = list(keys)
-
+def save_csv(rows, filename):
     with open(
-        output_csv,
+        filename,
         "w",
         newline="",
         encoding="utf-8-sig"
     ) as f:
         writer = csv.DictWriter(
             f,
-            fieldnames=keys
+            fieldnames=CSV_FIELDS,
+            extrasaction="ignore"
         )
         writer.writeheader()
         writer.writerows(rows)
 
 
 if __name__ == "__main__":
-    # 使用当前工作目录
+    # 未指定目录时使用当前工作目录
     input_folder = os.getcwd()
     output_file = "audio_info.csv"
-    scan_videos(
-        input_folder,
+    print("当前扫描目录:")
+    print(input_folder)
+    data = scan_videos(input_folder)
+    save_csv(
+        data,
         output_file
     )
-    print("完成:", output_file)
+    print("\n完成:")
+    print(
+        os.path.abspath(output_file)
+    )
