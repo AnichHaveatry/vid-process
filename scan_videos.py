@@ -129,7 +129,7 @@ def main():
     # results.sort(key=lambda x: x["bitrate_kbps"], reverse=True)
     results.sort(key=lambda x: x["bitrate_mbps"], reverse=True)
 
-    with open("video_report.csv", "w", newline="", encoding="utf-8") as f:
+    with open("video_report.csv", "w", newline="", encoding="utf-8-sig") as f:
         writer = csv.DictWriter(
             f,
             fieldnames=[
