@@ -74,12 +74,12 @@ choose_scale() {
             for (p = 1; p < q; p++) {
                 if ((p * w) % q != 0) continue          # 宽必须整除，不允许取整
                 if ((p * h) % q != 0) continue          # 高必须整除，不允许取整
-                nw = p * w / q
-                nh = p * h / q
-                if (nw % 2 != 0 || nh % 2 != 0) continue # yuv420p 要求宽高都为偶数
-                if (p * p * P > q * q * T) continue     # 缩放后等效分辨率必须 <= 1440
-                                                        # （把 > 改成 >= 就是严格小于 1440）
-                err = (q * q * T - p * p * P) / (q * q * T)
+                nw = int(p * w / q / 2) * 2
+                nh = int(p * h / q / 2) * 2
+                if (nw < 2 || nh < 2) continue
+                if (nw * nh > T * 1.01) continue          # 允许最多超过目标面积 1%
+                err = (nw * nh - T) / T
+                if (err < 0) err = -err                   # 超过或低于目标都按距离评分
                 score = err * 1000 + pen * q
                 if (score < best_score) {
                     best_score = score
@@ -117,10 +117,10 @@ while IFS= read -r -d '' f; do
     if [[ -n ${w:-} && -n ${h:-} ]] && (( w * h > TARGET_AREA )); then
         read -r p q < <(choose_scale "$w" "$h")
         if [[ -n ${p:-} && -n ${q:-} ]]; then
-            # 上面的比例已经保证整除且结果为偶数，这里直接算，不做任何取整
-            nw=$(( w * p / q ))
-            nh=$(( h * p / q ))
-            vf=(-vf "scale=iw*${p}/${q}:ih*${p}/${q}")
+            # 缩放后向下调整到最近的偶数尺寸，避免 yuv420p/nvenc 的奇数尺寸问题
+            nw=$(( (w * p / q / 2) * 2 ))
+            nh=$(( (h * p / q / 2) * 2 ))
+            vf=(-vf "scale=trunc(iw*${p}/${q}/2)*2:trunc(ih*${p}/${q}/2)*2")
             desc="缩放 ${w}x${h} → ${nw}x${nh} (系数 ${p}/${q}, 等效 $(gm "$w" "$h") → $(gm "$nw" "$nh"))"
         else
             desc="不缩放 [${w}x${h}, 等效 $(gm "$w" "$h")，没有合适的简单整数比]"
