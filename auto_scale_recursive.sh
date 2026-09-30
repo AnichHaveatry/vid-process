@@ -49,7 +49,7 @@ NVENC_CQ=35
 
 TARGET_AREA=$(( TARGET_GM * TARGET_GM ))   # 1440^2 = 2073600 = 1920*1080
 
-# 读取第一个视频流的宽高；成功输出 "W H"，失败（无视频流 / 读取不到）无输出
+# 读取第一个视频流的宽高；成功时输出 "W H"，否则无输出。
 get_wh() {
     ffprobe -v error -select_streams v:0 \
             -show_entries stream=width,height \
@@ -60,7 +60,12 @@ get_wh() {
                    exit }'
 }
 
-# 选出缩放系数 p/q：输出 "<p> <q>"（p < q）；不需要缩放时无输出
+# 输出宽高的几何平均值（等效分辨率），取整显示。
+gm() {
+    awk -v a="$1" -v b="$2" 'BEGIN { printf "%.0f", sqrt(a * b) }'
+}
+
+# 选出缩放系数 p/q：输出 "p q"（p < q）；不缩放时无输出。
 choose_scale() {
     awk -v w="$1" -v h="$2" -v T="$TARGET_AREA" -v maxq="$MAX_Q" -v pen="$COMPLEXITY_PENALTY" '
     BEGIN {
@@ -93,8 +98,57 @@ choose_scale() {
     }'
 }
 
-# 等效分辨率 sqrt(a*b)，保留整数
-gm() { awk -v a="$1" -v b="$2" 'BEGIN { printf "%.0f", sqrt(a * b) }'; }
+# 为缩放视频设置滤镜与说明文字。
+# 结果通过全局变量 vf 和 desc 返回，以保持调用处的 ffmpeg 参数结构简洁。
+configure_scaling() {
+    local w="$1"
+    local h="$2"
+    local p q nw nh
+
+    vf=()
+    desc="不缩放"
+
+    if [[ -z ${w:-} || -z ${h:-} ]] || (( w * h <= TARGET_AREA )); then
+        desc="不缩放 [${w}x${h}, 等效 $(gm "$w" "$h") <= $TARGET_GM]"
+        return
+    fi
+
+    read -r p q < <(choose_scale "$w" "$h")
+    if [[ -z ${p:-} || -z ${q:-} ]]; then
+        desc="不缩放 [${w}x${h}, 等效 $(gm "$w" "$h")，没有合适的简单整数比]"
+        return
+    fi
+
+    nw=$(( (w * p / q / 2) * 2 ))
+    nh=$(( (h * p / q / 2) * 2 ))
+    vf=(-vf "scale=trunc(iw*${p}/${q}/2)*2:trunc(ih*${p}/${q}/2)*2")
+    desc="缩放 ${w}x${h} → ${nw}x${nh} (系数 ${p}/${q}, 等效 $(gm "$w" "$h") → $(gm "$nw" "$nh"))"
+}
+
+process_video() {
+    local input="$1"
+    local dir filename out w h
+
+    dir=$(dirname "$input")
+    filename=$(basename "$input")
+    out="$dir/${OUTPUT_PREFIX}${filename}"
+
+    read -r w h < <(get_wh "$input")
+    configure_scaling "$w" "$h"
+
+    echo "压缩      ${desc}  $input"
+
+    ffmpeg -hide_banner \
+        -nostdin -y \
+        -threads 0 \
+        -i "$input" \
+        ${vf[@]+"${vf[@]}"} \
+        -c:v h264_nvenc \
+        -pix_fmt yuv420p \
+        -preset "$NVENC_PRESET" \
+        -cq "$NVENC_CQ" \
+        -c:a copy "$out" || echo "  ！ffmpeg 处理失败: $input"
+}
 
 echo "工作目录           : $WORK_DIR"
 echo "目标等效分辨率     : sqrt(宽*高) ≈ $TARGET_GM  (像素数 > $TARGET_AREA 才缩放)"
@@ -104,41 +158,5 @@ echo
 find "$WORK_DIR" -type f \( -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.avi" \
     -o -iname "*.mov" -o -iname "*.flv" -o -iname "*.webm" \) -print0 |
 while IFS= read -r -d '' f; do
-    dir=$(dirname "$f")
-    filename=$(basename "$f")
-    out="$dir/${OUTPUT_PREFIX}${filename}"
-
-    read -r w h < <(get_wh "$f")
-
-    # 判断：是否需要缩放。只有"等效分辨率 > 1440"且"能找到合适的简单整数比"时才加 -vf，
-    # 其余情况一律不加缩放滤镜，但仍然照常用完全相同的参数重新压缩。
-    vf=()
-    desc="不缩放"
-    if [[ -n ${w:-} && -n ${h:-} ]] && (( w * h > TARGET_AREA )); then
-        read -r p q < <(choose_scale "$w" "$h")
-        if [[ -n ${p:-} && -n ${q:-} ]]; then
-            # 缩放后向下调整到最近的偶数尺寸，避免 yuv420p/nvenc 的奇数尺寸问题
-            nw=$(( (w * p / q / 2) * 2 ))
-            nh=$(( (h * p / q / 2) * 2 ))
-            vf=(-vf "scale=trunc(iw*${p}/${q}/2)*2:trunc(ih*${p}/${q}/2)*2")
-            desc="缩放 ${w}x${h} → ${nw}x${nh} (系数 ${p}/${q}, 等效 $(gm "$w" "$h") → $(gm "$nw" "$nh"))"
-        else
-            desc="不缩放 [${w}x${h}, 等效 $(gm "$w" "$h")，没有合适的简单整数比]"
-        fi
-    else
-        desc="不缩放 [${w}x${h}, 等效 $(gm "$w" "$h") <= $TARGET_GM]"
-    fi
-
-    echo "压缩      ${desc}  $f"
-
-    ffmpeg -hide_banner \
-        -nostdin -y \
-        -threads 0 \
-        -i "$f" \
-        ${vf[@]+"${vf[@]}"} \
-        -c:v h264_nvenc \
-        -pix_fmt yuv420p \
-        -preset "$NVENC_PRESET" \
-        -cq "$NVENC_CQ" \
-        -c:a copy "$out" || echo "  ！ffmpeg 处理失败: $f"
+    process_video "$f"
 done
